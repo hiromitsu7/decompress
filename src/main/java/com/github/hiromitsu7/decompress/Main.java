@@ -1,0 +1,111 @@
+package com.github.hiromitsu7.decompress;
+
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.RandomAccessFile;
+import java.nio.file.Files;
+import java.util.zip.GZIPInputStream;
+
+import org.apache.commons.compress.archivers.ArchiveEntry;
+import org.apache.commons.compress.archivers.ArchiveException;
+import org.apache.commons.compress.archivers.ArchiveInputStream;
+import org.apache.commons.compress.archivers.ArchiveStreamFactory;
+import org.apache.commons.compress.utils.IOUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class Main {
+
+  private static Logger logger = LoggerFactory.getLogger(Main.class);
+
+  public static void main(String[] args) {
+    String fileName = args[0];
+    decompress(fileName);
+  }
+
+  private static void decompress(String fileName) {
+    String dirName = fileName + "-decompress";
+    File dstDir = new File(dirName);
+    if (!dstDir.exists()) {
+      dstDir.mkdir();
+    }
+
+    logger.info("fileName: {}", fileName);
+    File f = new File(fileName);
+
+    f = decompressGzipAndRename(f);
+
+    try (FileInputStream fis = new FileInputStream(f);
+        BufferedInputStream bis = new BufferedInputStream(fis);
+        ArchiveInputStream input = new ArchiveStreamFactory().createArchiveInputStream(bis);) {
+      ArchiveEntry entry = null;
+      while ((entry = input.getNextEntry()) != null) {
+        decompressZipAndTar(dirName, input, entry);
+      }
+    } catch (ArchiveException e) {
+      return;
+    } catch (IOException e) {
+      throw new IllegalArgumentException(e);
+    }
+  }
+
+  private static void decompressZipAndTar(String dirName, ArchiveInputStream input, ArchiveEntry entry)
+      throws IOException {
+    File newFile = new File(dirName, entry.getName());
+    if (entry.isDirectory()) {
+      File dir = newFile;
+      if (!dir.exists()) {
+        dir.mkdirs();
+      }
+    } else {
+      File dir = new File(newFile.getParent());
+      if (!dir.exists()) {
+        dir.mkdirs();
+      }
+      OutputStream output = new FileOutputStream(newFile);
+      IOUtils.copy(input, output);
+      output.close();
+      decompress(newFile.getAbsolutePath());
+    }
+  }
+
+  private static File decompressGzipAndRename(File f) {
+    if (isGZipped(f)) {
+      File target = new File(f.getAbsoluteFile() + "-ungzip");
+      decompressGzip(f, target);
+      try {
+        Files.delete(f.toPath());
+        f = target;
+      } catch (IOException e) {
+        throw new IllegalArgumentException(e);
+      }
+    }
+    return f;
+  }
+
+  private static boolean isGZipped(File f) {
+    try (RandomAccessFile raf = new RandomAccessFile(f, "r")) {
+      int magic = raf.read() & 0xff | ((raf.read() << 8) & 0xff00);
+      return magic == GZIPInputStream.GZIP_MAGIC;
+    } catch (IOException e) {
+      throw new IllegalArgumentException(e);
+    }
+  }
+
+  private static void decompressGzip(File source, File target) {
+    try (GZIPInputStream gis = new GZIPInputStream(new FileInputStream(source));
+        FileOutputStream fos = new FileOutputStream(target)) {
+      byte[] buffer = new byte[1024];
+      int len;
+      while ((len = gis.read(buffer)) > 0) {
+        fos.write(buffer, 0, len);
+      }
+    } catch (IOException e) {
+      throw new IllegalArgumentException(e);
+    }
+  }
+}
