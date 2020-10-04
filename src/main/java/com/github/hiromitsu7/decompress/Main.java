@@ -33,15 +33,9 @@ public class Main {
    * @param fileName 展開するファイル名
    */
   private static void decompress(String fileName) {
-    String dirName = fileName + "-decompress";
-    File dstDir = new File(dirName);
-    if (!dstDir.exists()) {
-      dstDir.mkdir();
-    }
-
     logger.info("fileName: {}", fileName);
-    File f = new File(fileName);
 
+    File f = new File(fileName);
     f = decompressGzipAndRename(f);
 
     try (FileInputStream fis = new FileInputStream(f);
@@ -49,12 +43,13 @@ public class Main {
         ArchiveInputStream input = new ArchiveStreamFactory().createArchiveInputStream(bis);) {
       ArchiveEntry entry = null;
       while ((entry = input.getNextEntry()) != null) {
-        decompressZipAndTar(dirName, input, entry);
+        decompressZipAndTar(fileName, input, entry);
       }
     } catch (IOException e) {
       throw new IllegalArgumentException(e);
     } catch (ArchiveException e) {
-      logger.info("ArchiveException: {}", e.getMessage());
+      // 通常のファイルの場合にもArchiveExceptionがスローされる.その場合は無視可能
+      logger.debug("ArchiveException: {}", e.getMessage());
     }
   }
 
@@ -66,8 +61,9 @@ public class Main {
    * @param entry
    * @throws IOException
    */
-  private static void decompressZipAndTar(String dirName, ArchiveInputStream input, ArchiveEntry entry)
+  private static void decompressZipAndTar(String fileName, ArchiveInputStream input, ArchiveEntry entry)
       throws IOException {
+    String dirName = fileName + "-decompress";
     File newFile = new File(dirName, entry.getName());
     if (entry.isDirectory()) {
       File dir = newFile;
