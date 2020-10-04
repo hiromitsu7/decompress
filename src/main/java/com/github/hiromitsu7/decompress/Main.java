@@ -27,6 +27,11 @@ public class Main {
     decompress(fileName);
   }
 
+  /**
+   * 圧縮ファイルを展開する
+   * 
+   * @param fileName 展開するファイル名
+   */
   private static void decompress(String fileName) {
     String dirName = fileName + "-decompress";
     File dstDir = new File(dirName);
@@ -46,13 +51,21 @@ public class Main {
       while ((entry = input.getNextEntry()) != null) {
         decompressZipAndTar(dirName, input, entry);
       }
-    } catch (ArchiveException e) {
-      return;
     } catch (IOException e) {
       throw new IllegalArgumentException(e);
+    } catch (ArchiveException e) {
+      logger.info("ArchiveException: {}", e.getMessage());
     }
   }
 
+  /**
+   * ZIPファイルとTARファイルを展開する
+   * 
+   * @param dirName
+   * @param input
+   * @param entry
+   * @throws IOException
+   */
   private static void decompressZipAndTar(String dirName, ArchiveInputStream input, ArchiveEntry entry)
       throws IOException {
     File newFile = new File(dirName, entry.getName());
@@ -73,6 +86,12 @@ public class Main {
     }
   }
 
+  /**
+   * GZIPファイルは展開し、展開後のファイル名を返却する. GZIPファイルを展開した場合、複数のファイルが含まれることはない
+   * 
+   * @param f
+   * @return
+   */
   private static File decompressGzipAndRename(File f) {
     if (isGZipped(f)) {
       File target = new File(f.getAbsoluteFile() + "-ungzip");
@@ -87,15 +106,12 @@ public class Main {
     return f;
   }
 
-  private static boolean isGZipped(File f) {
-    try (RandomAccessFile raf = new RandomAccessFile(f, "r")) {
-      int magic = raf.read() & 0xff | ((raf.read() << 8) & 0xff00);
-      return magic == GZIPInputStream.GZIP_MAGIC;
-    } catch (IOException e) {
-      throw new IllegalArgumentException(e);
-    }
-  }
-
+  /**
+   * GZIPファイルを展開する
+   * 
+   * @param source
+   * @param target
+   */
   private static void decompressGzip(File source, File target) {
     try (GZIPInputStream gis = new GZIPInputStream(new FileInputStream(source));
         FileOutputStream fos = new FileOutputStream(target)) {
@@ -104,6 +120,21 @@ public class Main {
       while ((len = gis.read(buffer)) > 0) {
         fos.write(buffer, 0, len);
       }
+    } catch (IOException e) {
+      throw new IllegalArgumentException(e);
+    }
+  }
+
+  /**
+   * GZIPファイルかどうかを判定する
+   * 
+   * @param f
+   * @return
+   */
+  private static boolean isGZipped(File f) {
+    try (RandomAccessFile raf = new RandomAccessFile(f, "r")) {
+      int magic = raf.read() & 0xff | ((raf.read() << 8) & 0xff00);
+      return magic == GZIPInputStream.GZIP_MAGIC;
     } catch (IOException e) {
       throw new IllegalArgumentException(e);
     }
